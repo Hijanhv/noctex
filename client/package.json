@@ -1,0 +1,25 @@
+{
+  "name": "noctex-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "submit": "bun run src/submit-order.ts",
+    "match": "bun run src/execute-match.ts",
+    "settle": "bun run src/settle-match.ts",
+    "watch": "bun run src/watch-events.ts",
+    "init-dwallet": "bun run src/init-dwallet.ts",
+    "update-dwallet": "bun run src/update-dwallet.ts",
+    "sign-settlement": "bun run src/sign-settlement.ts",
+    "check": "bun run src/check.ts"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
+    "@noble/hashes": "^2.2.0",
+    "@solana/web3.js": "^1.95.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.6.0"
+  }
+}

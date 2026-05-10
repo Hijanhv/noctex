@@ -1,0 +1,239 @@
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Design tokens ─── */
+:root {
+  --bg:            #000000;
+  --surface-1:     #060606;
+  --surface-2:     #0c0c0c;
+  --surface-3:     #111111;
+  --border:        rgba(0, 255, 136, 0.07);
+  --border-mid:    rgba(0, 255, 136, 0.14);
+  --border-hi:     rgba(0, 255, 136, 0.30);
+  --accent:        #00ff88;
+  --accent-glow:   rgba(0, 255, 136, 0.15);
+  --accent-dim:    rgba(0, 255, 136, 0.50);
+  --sell:          #ff3d6b;
+  --sell-glow:     rgba(255, 61, 107, 0.12);
+  --sell-dim:      rgba(255, 61, 107, 0.50);
+  --text-1:        #f0f0f0;
+  --text-2:        #b0b0b0;
+  --text-3:        #707070;
+  --font-display:  'Chakra Petch', sans-serif;
+  --font-mono:     'JetBrains Mono', monospace;
+}
+
+/* ─── Base ─── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  background: var(--bg);
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* Subtle grid background */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,255,136,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,136,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Radial vignette */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse 80% 60% at 50% 0%, transparent 40%, rgba(0,0,0,0.85) 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 0; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent-dim); }
+
+/* ─── Wallet adapter modal — white bright popup ─── */
+.wallet-adapter-modal-overlay {
+  z-index: 9998 !important;
+  background: rgba(0,0,0,0.6) !important;
+}
+.wallet-adapter-modal {
+  z-index: 9999 !important;
+}
+.wallet-adapter-modal-wrapper {
+  background: #ffffff !important;
+  border-radius: 16px !important;
+  box-shadow: 0 8px 64px rgba(0,0,0,0.35) !important;
+  border: none !important;
+}
+.wallet-adapter-modal-title {
+  color: #111111 !important;
+  font-size: 20px !important;
+  font-weight: 700 !important;
+  font-family: sans-serif !important;
+}
+.wallet-adapter-modal-list li {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 12px !important;
+}
+.wallet-adapter-modal-list .wallet-adapter-button {
+  background: #f5f5f5 !important;
+  border: 1px solid #e8e8e8 !important;
+  border-radius: 12px !important;
+  color: #111111 !important;
+  font-size: 16px !important;
+  font-weight: 500 !important;
+  font-family: sans-serif !important;
+  transition: background 0.15s !important;
+}
+.wallet-adapter-modal-list .wallet-adapter-button:hover {
+  background: #eeeeee !important;
+  border-color: #d0d0d0 !important;
+}
+.wallet-adapter-modal-list .wallet-adapter-button-end-icon,
+.wallet-adapter-modal-list .wallet-adapter-button p {
+  color: #555555 !important;
+}
+.wallet-adapter-modal-list-more,
+.wallet-adapter-modal-list-more span {
+  color: #555555 !important;
+}
+.wallet-adapter-modal-middle {
+  background: #ffffff !important;
+}
+.wallet-adapter-modal-button-close {
+  background: #f0f0f0 !important;
+}
+.wallet-adapter-modal-button-close svg {
+  fill: #444444 !important;
+}
+.wallet-adapter-modal-button-close:hover {
+  background: #e0e0e0 !important;
+}
+
+/* ─── Scramble animation ─── */
+@keyframes scramble-in {
+  0%   { opacity: 0.2; filter: blur(1px); }
+  100% { opacity: 1;   filter: blur(0); }
+}
+
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+@keyframes scan-line {
+  0%   { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+@keyframes pulse-ring {
+  0%   { transform: scale(1);   opacity: 0.6; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(0,255,136,0.15); }
+  50%       { box-shadow: 0 0 24px rgba(0,255,136,0.35); }
+}
+
+@keyframes row-appear {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes number-tick {
+  0%   { transform: translateY(6px); opacity: 0; }
+  100% { transform: translateY(0);   opacity: 1; }
+}
+
+/* ─── Utilities ─── */
+.font-display { font-family: var(--font-display); }
+.font-mono    { font-family: var(--font-mono); }
+
+.text-accent  { color: var(--accent); }
+.text-sell    { color: var(--sell); }
+.text-muted   { color: var(--text-2); }
+.text-dim     { color: var(--text-3); }
+
+.border-accent { border-color: var(--border-mid); }
+
+.surface-1 { background: var(--surface-1); }
+.surface-2 { background: var(--surface-2); }
+
+.noctex-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  position: relative;
+}
+.noctex-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-mid), transparent);
+}
+
+.tag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border: 1px solid currentColor;
+  opacity: 0.6;
+}
+
+.scan-cursor::after {
+  content: '█';
+  animation: cursor-blink 1s step-end infinite;
+  color: var(--accent);
+  margin-left: 2px;
+}
+
+.live-dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  position: relative;
+}
+.live-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse-ring 1.5s ease-out infinite;
+}
+
+/* ─── Input resets ─── */
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type='number'] { -moz-appearance: textfield; }
+
+input, select, textarea {
+  font-family: var(--font-mono);
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-1);
+}
+
