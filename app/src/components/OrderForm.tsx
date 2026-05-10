@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useWallet } from "./WalletProvider";
+import { useWallet } from "@/components/WalletProvider";
 
 type Side = "buy" | "sell";
 
@@ -67,6 +67,8 @@ export function OrderForm() {
   const [amountFocused, setAmountFocused] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [cliCmd, setCliCmd] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const scrambledPrice = useScramble(price, priceFocused);
   const scrambledAmount = useScramble(amount, amountFocused);
@@ -80,14 +82,27 @@ export function OrderForm() {
     if (!price || !amount || submitting) return;
     setSubmitting(true);
     await new Promise(r => setTimeout(r, 1400));
+    const sideArg = side === "buy" ? "Buy" : "Sell";
+    setCliCmd(`bun run src/submit-order.ts ${sideArg} ${price} ${amount}`);
     setSubmitting(false);
     setSubmitted(true);
-    setTimeout(() => {
-      setSubmitted(false);
-      setPrice("");
-      setAmount("");
-    }, 3000);
-  }, [price, amount, submitting]);
+  }, [price, amount, side, submitting]);
+
+  const handleReset = useCallback(() => {
+    setSubmitted(false);
+    setCliCmd(null);
+    setCopied(false);
+    setPrice("");
+    setAmount("");
+  }, []);
+
+  const handleCopy = useCallback(() => {
+    if (!cliCmd) return;
+    navigator.clipboard?.writeText(cliCmd).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }).catch(() => {});
+  }, [cliCmd]);
 
   return (
     <div
@@ -328,10 +343,60 @@ export function OrderForm() {
           >
             CONNECT WALLET TO TRADE
           </button>
+        ) : submitted && cliCmd ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{
+              fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--accent)",
+              letterSpacing: "0.14em", textTransform: "uppercase",
+              display: "flex", alignItems: "center", gap: 6,
+            }}>
+              ◈ CIPHERTEXTS BUILT — RUN ON-CHAIN
+            </div>
+            <div style={{
+              background: "#000", border: "1px solid rgba(0,255,136,0.30)",
+              padding: "10px 12px",
+              fontFamily: "var(--font-mono)", fontSize: 10.5, color: "var(--accent)",
+              wordBreak: "break-all", lineHeight: 1.5,
+              cursor: "pointer", userSelect: "all",
+            }}
+              onClick={handleCopy}
+              title="Click to copy"
+            >
+              <span style={{ color: "var(--text-3)" }}>$ </span>{cliCmd}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={handleCopy} style={{
+                flex: 1, padding: "9px 0",
+                background: copied ? "rgba(0,255,136,0.15)" : "transparent",
+                border: `1px solid ${copied ? "var(--accent)" : "rgba(0,255,136,0.20)"}`,
+                color: "var(--accent)",
+                fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.14em",
+                textTransform: "uppercase", cursor: "pointer",
+              }}>
+                {copied ? "✓ COPIED" : "COPY CMD"}
+              </button>
+              <button onClick={handleReset} style={{
+                flex: 1, padding: "9px 0",
+                background: "transparent",
+                border: "1px solid rgba(255,255,255,0.10)",
+                color: "var(--text-2)",
+                fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.14em",
+                textTransform: "uppercase", cursor: "pointer",
+              }}>
+                NEW ORDER
+              </button>
+            </div>
+            <div style={{
+              fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--text-3)",
+              letterSpacing: "0.06em", lineHeight: 1.6, marginTop: 2,
+            }}>
+              Run from <code style={{ color: "var(--text-2)" }}>noctex/client</code>. The Encrypt gRPC executor encrypts price/amount, then submits to program <code style={{ color: "var(--accent)" }}>833YAgrb…</code> on devnet.
+            </div>
+          </div>
         ) : (
           <button
             onClick={handleSubmit}
-            disabled={!price || !amount || submitting || submitted}
+            disabled={!price || !amount || submitting}
             style={{
               width: "100%",
               padding: "13px 0",
@@ -340,15 +405,9 @@ export function OrderForm() {
               fontWeight: 700,
               letterSpacing: "0.22em",
               textTransform: "uppercase",
-              background: submitted
-                ? "rgba(0,255,136,0.1)"
-                : side === "buy"
-                ? "rgba(0,255,136,0.12)"
-                : "rgba(255,61,107,0.12)",
-              color: submitted
-                ? "var(--accent)"
-                : side === "buy" ? "var(--accent)" : "var(--sell)",
-              border: `1px solid ${submitted ? "var(--accent)" : accent}`,
+              background: side === "buy" ? "rgba(0,255,136,0.12)" : "rgba(255,61,107,0.12)",
+              color: side === "buy" ? "var(--accent)" : "var(--sell)",
+              border: `1px solid ${accent}`,
               cursor: !price || !amount ? "not-allowed" : "pointer",
               opacity: !price || !amount ? 0.4 : 1,
               transition: "all 0.15s",
@@ -356,11 +415,7 @@ export function OrderForm() {
               overflow: "hidden",
             }}
           >
-            {submitting
-              ? "ENCRYPTING ORDER..."
-              : submitted
-              ? "✓ ORDER SUBMITTED"
-              : `PLACE ${side.toUpperCase()} ORDER`}
+            {submitting ? "ENCRYPTING ORDER…" : `PLACE ${side.toUpperCase()} ORDER`}
             {submitting && (
               <span style={{
                 position: "absolute",

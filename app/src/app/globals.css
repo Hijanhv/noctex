@@ -57,9 +57,9 @@ body::after {
   content: '';
   position: fixed;
   inset: 0;
-  background: radial-gradient(ellipse 80% 60% at 50% 0%, transparent 40%, rgba(0,0,0,0.85) 100%);
+  background: radial-gradient(ellipse 80% 60% at 50% 0%, transparent 40%, rgba(0,0,0,0.30) 100%);
   pointer-events: none;
-  z-index: 0;
+  z-index: -1;
 }
 
 /* ─── Scrollbar ─── */

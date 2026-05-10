@@ -4,19 +4,17 @@ import { WalletContextProvider } from '@/components/WalletProvider'
 import { Navbar } from '@/components/Navbar'
 
 export const metadata: Metadata = {
-  title: 'NOCTEX — Encrypted Dark Pool',
-  description: 'FHE-encrypted order matching · dWallet 2PC-MPC settlement · Solana devnet',
+  title: 'Noctex — Encrypted Dark Pool',
+  description: 'Trade in the dark.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-black overflow-x-hidden">
+      <body>
         <WalletContextProvider>
-          <div className="relative z-10">
-            <Navbar />
-            {children}
-          </div>
+          <Navbar />
+          {children}
         </WalletContextProvider>
       </body>
     </html>

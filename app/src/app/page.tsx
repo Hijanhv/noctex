@@ -8,14 +8,15 @@ import { LifiSettlement } from "@/components/LifiSettlement";
 
 const PROGRAM_ID = "833YAgrbapXnLiYkUq6tG6hWfZ7whX34Xs7CtBN8Nrvx";
 
+const HERO_WORDS = ["ENCRYPTED", "DARK POOL", "ORDERS"];
+
 function HeroStrip() {
   const [cursor, setCursor] = useState(true);
-  const words = ["ENCRYPTED", "DARK POOL", "ORDERS"];
   const [wordIdx, setWordIdx] = useState(0);
 
   useEffect(() => {
     const c = setInterval(() => setCursor(v => !v), 530);
-    const w = setInterval(() => setWordIdx(i => (i + 1) % words.length), 1800);
+    const w = setInterval(() => setWordIdx(i => (i + 1) % HERO_WORDS.length), 1800);
     return () => { clearInterval(c); clearInterval(w); };
   }, []);
 
@@ -40,7 +41,7 @@ function HeroStrip() {
           letterSpacing: "0.22em",
           color: "var(--accent)",
         }}>
-          {words[wordIdx]}
+          {HERO_WORDS[wordIdx]}
           <span style={{ opacity: cursor ? 1 : 0, color: "var(--accent)" }}>█</span>
         </span>
         <span style={{
@@ -87,21 +88,21 @@ function HeroStrip() {
   );
 }
 
-function EncryptedTerminal() {
-  const LINES = [
-    { t: 0,    text: "> noctex-ika-bootstrap init 833YAgrb…",   color: "var(--text-1)" },
-    { t: 400,  text: "  ✓ DKG complete — dWallet: 3om31VWz…",   color: "var(--accent)" },
-    { t: 800,  text: "  ✓ Transfer to CPI authority — OK",       color: "var(--accent)" },
-    { t: 1200, text: "> sign_settlement SOL/USDC 12.5 …",        color: "var(--text-1)" },
-    { t: 1600, text: "  ◈ FHE match_orders: bid >= ask → true",  color: "#60a5fa" },
-    { t: 2000, text: "  ✓ MessageApproval: 86ckVnh4… signed",    color: "var(--accent)" },
-    { t: 2400, text: "  ✓ Ed25519 sig on-chain: f231157b…",      color: "var(--accent)" },
-  ];
+const TERMINAL_LINES = [
+  { t: 0,    text: "> noctex-ika-bootstrap init 833YAgrb…",   color: "var(--text-1)" },
+  { t: 400,  text: "  ✓ DKG complete — dWallet: 3om31VWz…",   color: "var(--accent)" },
+  { t: 800,  text: "  ✓ Transfer to CPI authority — OK",       color: "var(--accent)" },
+  { t: 1200, text: "> sign_settlement SOL/USDC 12.5 …",        color: "var(--text-1)" },
+  { t: 1600, text: "  ◈ FHE match_orders: bid >= ask → true",  color: "#60a5fa" },
+  { t: 2000, text: "  ✓ MessageApproval: 86ckVnh4… signed",    color: "var(--accent)" },
+  { t: 2400, text: "  ✓ Ed25519 sig on-chain: f231157b…",      color: "var(--accent)" },
+];
 
+function EncryptedTerminal() {
   const [visible, setVisible] = useState(0);
 
   useEffect(() => {
-    LINES.forEach(({ t }, i) => {
+    TERMINAL_LINES.forEach(({ t }, i) => {
       setTimeout(() => setVisible(v => Math.max(v, i + 1)), t + 300);
     });
   }, []);
@@ -142,12 +143,12 @@ function EncryptedTerminal() {
         </span>
       </div>
 
-      {LINES.slice(0, visible).map(({ text, color }, i) => (
+      {TERMINAL_LINES.slice(0, visible).map(({ text, color }, i) => (
         <div key={i} style={{ color, letterSpacing: "0.04em" }}>
           {text}
         </div>
       ))}
-      {visible < LINES.length && (
+      {visible < TERMINAL_LINES.length && (
         <span style={{ color: "var(--accent)", animation: "cursor-blink 1s step-end infinite" }}>█</span>
       )}
     </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from "next/link";
-import { WalletButton } from "@/components/WalletButton";
+import { useWallet } from "@/components/WalletProvider";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -15,6 +15,7 @@ const NAV_LINKS = [
 
 export function Navbar() {
   const pathname = usePathname();
+  const { connected, publicKey, connect, disconnect, connecting } = useWallet();
   const [prices, setPrices] = useState({ SOL: 148.32, ETH: 2841.5, BTC: 67320 });
 
   useEffect(() => {
@@ -140,7 +141,39 @@ export function Navbar() {
             ))}
           </div>
 
-          <WalletButton />
+          {connected && publicKey ? (
+            <button
+              onClick={disconnect}
+              style={{
+                display: "flex", alignItems: "center", gap: 8,
+                fontFamily: "'JetBrains Mono',monospace",
+                fontSize: 10, letterSpacing: "0.12em", padding: "7px 14px", cursor: "pointer",
+                border: "1px solid rgba(0,255,136,0.4)", background: "rgba(0,255,136,0.08)", color: "#00ff88",
+              }}
+              onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = "rgba(0,255,136,0.16)")}
+              onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = "rgba(0,255,136,0.08)")}
+            >
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#00ff88", display: "inline-block", flexShrink: 0 }} />
+              {publicKey.toBase58().slice(0, 4)}…{publicKey.toBase58().slice(-4)}
+            </button>
+          ) : (
+            <button
+              onClick={connect}
+              disabled={connecting}
+              style={{
+                display: "flex", alignItems: "center", gap: 8,
+                fontFamily: "'JetBrains Mono',monospace",
+                fontSize: 10, letterSpacing: "0.12em", padding: "7px 14px",
+                cursor: connecting ? "wait" : "pointer",
+                border: "1px solid rgba(0,255,136,0.28)", background: "transparent", color: "#00ff88",
+                opacity: connecting ? 0.55 : 1,
+              }}
+              onMouseEnter={e => { if (!connecting) (e.currentTarget as HTMLElement).style.background = "rgba(0,255,136,0.10)" }}
+              onMouseLeave={e => { if (!connecting) (e.currentTarget as HTMLElement).style.background = "transparent" }}
+            >
+              {connecting ? "APPROVING…" : "CONNECT WALLET"}
+            </button>
+          )}
         </div>
       </div>
     </nav>

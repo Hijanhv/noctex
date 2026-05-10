@@ -97,7 +97,7 @@ export default function PortfolioPage() {
             </div>
             <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-2)", letterSpacing: "0.1em" }}>
               {connected && publicKey
-                ? `${publicKey.slice(0, 8)}…${publicKey.slice(-8)}`
+                ? `${publicKey.toBase58().slice(0, 8)}…${publicKey.toBase58().slice(-8)}`
                 : "CONNECT WALLET TO VIEW ORDERS"}
             </div>
           </div>
