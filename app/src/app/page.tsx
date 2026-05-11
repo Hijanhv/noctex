@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { OrderForm } from "@/components/OrderForm";
+import { SettlementFlow } from "@/components/SettlementFlow";
 import { OrderBook } from "@/components/OrderBook";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { LifiSettlement } from "@/components/LifiSettlement";
@@ -186,6 +187,11 @@ export default function Home() {
         <div>
           <LifiSettlement />
         </div>
+      </div>
+
+      {/* Live settlement flow — match / settle / sign / finalize on-chain */}
+      <div style={{ borderBottom: "1px solid var(--border)" }}>
+        <SettlementFlow />
       </div>
 
       {/* Terminal section */}

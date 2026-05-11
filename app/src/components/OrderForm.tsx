@@ -1,7 +1,23 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { BN } from "@coral-xyz/anchor";
+import { PublicKey, SystemProgram } from "@solana/web3.js";
+import {
+  createEncryptWebClient,
+  Chain,
+} from "@encrypt.xyz/pre-alpha-solana-client/grpc-web";
 import { useWallet } from "@/components/WalletProvider";
+import {
+  ENCRYPT_GRPC_WEB,
+  FHE_TYPE_EUINT64,
+  NOCTEX_PROGRAM_ID,
+  PRE_ALPHA_NETWORK_KEY,
+  deriveOrderPda,
+  explorerTx,
+  getProgramWithPhantom,
+  mockCiphertextBytes,
+} from "@/lib/noctex-client";
 
 type Side = "buy" | "sell";
 
@@ -67,7 +83,14 @@ export function OrderForm() {
   const [amountFocused, setAmountFocused] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [cliCmd, setCliCmd] = useState<string | null>(null);
+  const [phase, setPhase] = useState<"idle" | "encrypting" | "signing" | "confirming">("idle");
+  const [result, setResult] = useState<{
+    orderPda: string;
+    sig: string;
+    priceCt: string;
+    amountCt: string;
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   const scrambledPrice = useScramble(price, priceFocused);
@@ -81,28 +104,80 @@ export function OrderForm() {
   const handleSubmit = useCallback(async () => {
     if (!price || !amount || submitting) return;
     setSubmitting(true);
-    await new Promise(r => setTimeout(r, 1400));
-    const sideArg = side === "buy" ? "Buy" : "Sell";
-    setCliCmd(`bun run src/submit-order.ts ${sideArg} ${price} ${amount}`);
-    setSubmitting(false);
-    setSubmitted(true);
+    setError(null);
+    try {
+      // 1) Connect to Phantom, build the Anchor program.
+      const { program, publicKey } = await getProgramWithPhantom();
+
+      // 2) Encrypt price + amount via Encrypt gRPC-web.
+      setPhase("encrypting");
+      const encrypt = createEncryptWebClient(ENCRYPT_GRPC_WEB);
+      const ids = await encrypt.createInput({
+        chain: Chain.SOLANA,
+        inputs: [
+          {
+            ciphertextBytes: mockCiphertextBytes(BigInt(price), FHE_TYPE_EUINT64),
+            fheType: FHE_TYPE_EUINT64,
+          },
+          {
+            ciphertextBytes: mockCiphertextBytes(BigInt(amount), FHE_TYPE_EUINT64),
+            fheType: FHE_TYPE_EUINT64,
+          },
+        ],
+        authorized: NOCTEX_PROGRAM_ID.toBytes(),
+        networkEncryptionPublicKey: PRE_ALPHA_NETWORK_KEY,
+      });
+      const encryptedPrice = new PublicKey(ids[0]);
+      const encryptedAmount = new PublicKey(ids[1]);
+
+      // 3) Submit on-chain via Phantom signature.
+      setPhase("signing");
+      const nonce = BigInt(Date.now());
+      const [orderPda] = deriveOrderPda(publicKey, nonce);
+      const sideArg = side === "buy" ? { buy: {} } : { sell: {} };
+
+      const sig = await program.methods
+        .submitOrder(new BN(nonce.toString()), sideArg, encryptedPrice, encryptedAmount)
+        .accountsPartial({
+          order: orderPda,
+          owner: publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc();
+
+      setPhase("confirming");
+      setResult({
+        orderPda: orderPda.toBase58(),
+        sig,
+        priceCt: encryptedPrice.toBase58(),
+        amountCt: encryptedAmount.toBase58(),
+      });
+      setSubmitted(true);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+    } finally {
+      setSubmitting(false);
+      setPhase("idle");
+    }
   }, [price, amount, side, submitting]);
 
   const handleReset = useCallback(() => {
     setSubmitted(false);
-    setCliCmd(null);
+    setResult(null);
+    setError(null);
     setCopied(false);
     setPrice("");
     setAmount("");
   }, []);
 
   const handleCopy = useCallback(() => {
-    if (!cliCmd) return;
-    navigator.clipboard?.writeText(cliCmd).then(() => {
+    if (!result?.orderPda) return;
+    navigator.clipboard?.writeText(result.orderPda).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     }).catch(() => {});
-  }, [cliCmd]);
+  }, [result]);
 
   return (
     <div
@@ -343,27 +418,39 @@ export function OrderForm() {
           >
             CONNECT WALLET TO TRADE
           </button>
-        ) : submitted && cliCmd ? (
+        ) : submitted && result ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{
               fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--accent)",
               letterSpacing: "0.14em", textTransform: "uppercase",
               display: "flex", alignItems: "center", gap: 6,
             }}>
-              ◈ CIPHERTEXTS BUILT — RUN ON-CHAIN
+              ◈ ORDER ON-CHAIN
             </div>
             <div style={{
               background: "#000", border: "1px solid rgba(0,255,136,0.30)",
               padding: "10px 12px",
-              fontFamily: "var(--font-mono)", fontSize: 10.5, color: "var(--accent)",
-              wordBreak: "break-all", lineHeight: 1.5,
+              fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--accent)",
+              wordBreak: "break-all", lineHeight: 1.55,
               cursor: "pointer", userSelect: "all",
             }}
               onClick={handleCopy}
-              title="Click to copy"
+              title="Click to copy Order PDA"
             >
-              <span style={{ color: "var(--text-3)" }}>$ </span>{cliCmd}
+              <div style={{ color: "var(--text-2)", fontSize: 8.5, marginBottom: 4, letterSpacing: "0.1em" }}>ORDER PDA</div>
+              {result.orderPda}
             </div>
+            <a
+              href={explorerTx(result.sig)} target="_blank" rel="noreferrer"
+              style={{
+                fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--accent)",
+                textDecoration: "none", padding: "8px 10px",
+                background: "rgba(0,255,136,0.05)", border: "1px solid rgba(0,255,136,0.15)",
+                letterSpacing: "0.08em",
+              }}
+            >
+              VIEW TX ON EXPLORER →
+            </a>
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={handleCopy} style={{
                 flex: 1, padding: "9px 0",
@@ -373,7 +460,7 @@ export function OrderForm() {
                 fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.14em",
                 textTransform: "uppercase", cursor: "pointer",
               }}>
-                {copied ? "✓ COPIED" : "COPY CMD"}
+                {copied ? "✓ COPIED" : "COPY PDA"}
               </button>
               <button onClick={handleReset} style={{
                 flex: 1, padding: "9px 0",
@@ -387,11 +474,38 @@ export function OrderForm() {
               </button>
             </div>
             <div style={{
-              fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--text-3)",
-              letterSpacing: "0.06em", lineHeight: 1.6, marginTop: 2,
+              fontFamily: "var(--font-mono)", fontSize: 8.5, color: "var(--text-3)",
+              letterSpacing: "0.06em", lineHeight: 1.7, marginTop: 2,
             }}>
-              Run from <code style={{ color: "var(--text-2)" }}>noctex/client</code>. The Encrypt gRPC executor encrypts price/amount, then submits to program <code style={{ color: "var(--accent)" }}>833YAgrb…</code> on devnet.
+              Encrypt gRPC built two ciphertexts (<span style={{ color: "var(--text-2)" }}>{result.priceCt.slice(0, 8)}…</span>, <span style={{ color: "var(--text-2)" }}>{result.amountCt.slice(0, 8)}…</span>) and submitted them to program <code style={{ color: "var(--accent)" }}>833YAgrb…</code> on devnet. Next step: pair with the opposite side, then click MATCH.
             </div>
+          </div>
+        ) : error ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{
+              fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--sell)",
+              letterSpacing: "0.14em", textTransform: "uppercase",
+            }}>
+              ✗ SUBMIT FAILED
+            </div>
+            <div style={{
+              background: "#1a0507", border: "1px solid rgba(255,61,107,0.35)",
+              padding: "10px 12px",
+              fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--sell)",
+              wordBreak: "break-word", lineHeight: 1.55,
+            }}>
+              {error}
+            </div>
+            <button onClick={handleReset} style={{
+              padding: "9px 0",
+              background: "transparent",
+              border: "1px solid rgba(255,255,255,0.10)",
+              color: "var(--text-2)",
+              fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.14em",
+              textTransform: "uppercase", cursor: "pointer",
+            }}>
+              DISMISS
+            </button>
           </div>
         ) : (
           <button
@@ -415,7 +529,15 @@ export function OrderForm() {
               overflow: "hidden",
             }}
           >
-            {submitting ? "ENCRYPTING ORDER…" : `PLACE ${side.toUpperCase()} ORDER`}
+            {!submitting
+              ? `PLACE ${side.toUpperCase()} ORDER`
+              : phase === "encrypting"
+                ? "ENCRYPTING VIA gRPC…"
+                : phase === "signing"
+                  ? "AWAITING PHANTOM SIGNATURE…"
+                  : phase === "confirming"
+                    ? "CONFIRMING ON DEVNET…"
+                    : "SUBMITTING…"}
             {submitting && (
               <span style={{
                 position: "absolute",

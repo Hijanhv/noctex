@@ -8,13 +8,14 @@ const PROTOCOLS = [
     name: "ENCRYPT FHE SDK",
     tagline: "Homomorphic order matching",
     color: "var(--accent)",
-    role: "Orders are encrypted client-side using FHE ciphertexts. The matching engine runs match_orders entirely on encrypted data — the program never sees plaintext prices or sizes. Only the final execution result (fill amounts, exec price) is revealed at settlement.",
+    role: "Price and size are encrypted client-side via gRPC createInput before they ever touch Solana. The Noctex program then CPIs into Encrypt's execute_graph with the match_orders graph — bid ≥ ask, min(amounts), conditional fills — all evaluated on ciphertexts. The executor never sees plaintext; only ciphertext pubkeys land on the Order PDA.",
     how: [
-      { label: "Instruction",  value: "submit_order, execute_match" },
-      { label: "DSL macro",    value: "#[encrypt_fn] match_orders(bid, ask) → (fill, exec_price)" },
-      { label: "Key types",    value: "EUint64 ciphertexts for all numeric fields" },
+      { label: "Instructions", value: "submit_order, execute_match, settle_match" },
+      { label: "DSL macro",    value: "#[encrypt_fn] match_orders(bid, ask) → (fill_b, fill_s, exec)" },
+      { label: "Key types",    value: "EUint64 ciphertexts (fhe_type=4)" },
       { label: "CPI seed",     value: 'b"__encrypt_cpi_authority"' },
-      { label: "Program",      value: "4ebfzWdKnrnGseuQpezXdG8yCdHqwQ1SSBHD3bWArND8 (devnet)" },
+      { label: "CPI shape",    value: "[disc=4, graph_len_u16, graph, num_inputs_u8] + 8 metas + 4 in + 3 out" },
+      { label: "Program",      value: "4ebfzWdK…wArND8 (devnet)" },
     ],
     links: [{ label: "docs.encrypt.xyz", href: "https://docs.encrypt.xyz" }],
   },
@@ -23,29 +24,29 @@ const PROTOCOLS = [
     name: "IKA dWALLET — 2PC-MPC",
     tagline: "Distributed settlement signing",
     color: "#60a5fa",
-    role: "Settlement authorization requires a distributed Ed25519 signature produced by the Ika network via 2PC-MPC. No single party holds the private key. The Noctex program CPI-calls the Ika program to create a MessageApproval PDA; the off-chain Ika network then produces the signature, committing it on-chain.",
+    role: "Settlement only advances if the Ika network produces a distributed signature over the settlement digest. sign_settlement CPIs into Ika to create a MessageApproval PDA; the network signs off-chain and commits the signature back. finalize_settlement reads the MessageApproval bytes on-chain and refuses to flip to Finalized unless owner=Ika, status=Signed, sig_len > 0.",
     how: [
-      { label: "DKG",          value: "gRPC DKG via ika-pre-alpha — produces dWallet PDA + Ed25519 pubkey" },
-      { label: "CPI call",     value: "sign_settlement → invoke approve_message on Ika program" },
-      { label: "MessageApproval", value: "86ckVnh4twmLruwH42YSwNrehNWZd6VdGfNBUnsXGbsJ (status=Signed)" },
-      { label: "Signature",    value: "f231157b…700b (64-byte Ed25519 on-chain)" },
-      { label: "dWallet PDA",  value: "3om31VWzJx6oPt37qYcUSZFosfFGZgeegX7VjQBi7aRG" },
-      { label: "Hash scheme",  value: "keccak256 (both client TS + Rust bootstrap must match)" },
+      { label: "DKG",          value: "gRPC DKG via ika-pre-alpha — dWallet PDA + Ed25519 pubkey" },
+      { label: "Sign CPI",     value: "sign_settlement → approve_message (disc 8, 100 bytes)" },
+      { label: "Verify gate",  value: "finalize_settlement reads bytes 172 (status) / 173-174 (sig_len) / 175+ (signature)" },
+      { label: "Hash scheme",  value: "keccak256(\"noctex-settlement-v0|<buy>|<sell>\")" },
+      { label: "dWallet",      value: "3om31VWzJx6oPt37qYcUSZFosfFGZgeegX7VjQBi7aRG (Curve25519)" },
+      { label: "Live signature", value: "b92d6c9c…4b69f07 (64-byte EddsaSha512 on-chain)" },
     ],
     links: [{ label: "solana-pre-alpha.ika.xyz", href: "https://solana-pre-alpha.ika.xyz" }],
   },
   {
     num: "03",
     name: "LI.FI SDK",
-    tagline: "Cross-chain token delivery",
+    tagline: "Cross-chain delivery",
     color: "#a78bfa",
-    role: "After a settlement is authorized by the dWallet signature, LI.FI routes the settled tokens cross-chain. A single settlement signature on Solana unlocks delivery to any supported EVM chain. The SDK is used to get bridge quotes and execute cross-chain transfers after settlement.",
+    role: "Once a settlement is Finalized, LI.FI provides the route to deliver value cross-chain. A single Ika signature on Solana unlocks bridging to any supported EVM chain — settlement integrity stays on Noctex; LI.FI just moves the asset.",
     how: [
       { label: "SDK",          value: "@lifi/sdk — getQuote, executeRoute" },
-      { label: "Widget",       value: "@lifi/widget — embeddable swap/bridge UI" },
-      { label: "Flow",         value: "settle_match → MessageApproval signed → LI.FI bridge route" },
+      { label: "Widget",       value: "@lifi/widget — embedded settlement-route UI" },
+      { label: "Flow",         value: "finalize_settlement → LI.FI route → cross-chain transfer" },
       { label: "Chains",       value: "Solana → Ethereum / Arbitrum / Base / Optimism" },
-      { label: "Integration",  value: "SettlementRoute component in Trade page" },
+      { label: "Integration",  value: "LifiSettlement panel on the trade page" },
     ],
     links: [{ label: "li.fi/sdk", href: "https://li.fi" }],
   },
@@ -53,61 +54,75 @@ const PROTOCOLS = [
 
 const CODE_SNIPPETS = [
   {
-    title: "FHE match_orders (programs/noctex/src/fhe.rs)",
+    title: "FHE match_orders graph (programs/noctex/src/fhe.rs)",
     lang: "rust",
     code: `#[encrypt_fn]
 pub fn match_orders(
-    bid_price: EUint64,
-    ask_price: EUint64,
-    bid_amount: EUint64,
-    ask_amount: EUint64,
+    bid_price: EUint64, ask_price: EUint64,
+    bid_amount: EUint64, ask_amount: EUint64,
 ) -> (EUint64, EUint64, EUint64) {
-    let matched = bid_price.is_greater_or_equal(&ask_price);
-    let min_amount = bid_amount.min(&ask_amount);
-    let fill = if matched { min_amount } else { EUint64::from(0u64) };
-    let exec  = if matched { ask_price  } else { EUint64::from(0u64) };
-    (fill, fill, exec)
+    let matched     = bid_price.is_greater_or_equal(&ask_price);
+    let min_amount  = bid_amount.min(&ask_amount);
+    let fill_buyer  = if matched { min_amount } else { EUint64::from(0u64) };
+    let fill_seller = if matched { min_amount } else { EUint64::from(0u64) };
+    let exec_price  = if matched { ask_price  } else { EUint64::from(0u64) };
+    (fill_buyer, fill_seller, exec_price)
 }`,
   },
   {
-    title: "Ika CPI approve_message (programs/noctex/src/dwallet.rs)",
+    title: "Encrypt execute_graph CPI (programs/noctex/src/fhe.rs)",
     lang: "rust",
-    code: `pub fn invoke_approve_message(ctx: &Context<SignSettlement>, ...) {
-    let data = approve_message_data(bump, msg_digest, meta_digest, user, scheme);
-    let accounts = vec![
-        ctx.accounts.dwallet.to_account_metas(None),
-        ctx.accounts.message_approval.to_account_metas(None),
-        ctx.accounts.cpi_authority.to_account_metas(None),
-        ctx.accounts.coordinator.to_account_metas(None),
-        ctx.accounts.payer.to_account_metas(None),
-        ctx.accounts.system_program.to_account_metas(None),
-        ctx.accounts.caller_program.to_account_metas(None),
-    ];
-    invoke_signed(&ix, &account_infos, &[CPI_AUTHORITY_SEED]);
+    code: `// We build the CPI inline to keep Noctex on anchor-lang 0.32.
+// Wire format (verified against the Encrypt SDK):
+//   ix_data  = [4, graph_len_u16_le, graph_bytes, num_inputs_u8]
+//   accounts = [config(W), deposit(W), caller_program, cpi_authority(S),
+//               network_encryption_key, payer(W,S), event_authority,
+//               encrypt_program, ...4_inputs(W), ...3_outputs(W)]
+let seeds: &[&[u8]] = &[ENCRYPT_CPI_AUTHORITY_SEED, &[cpi_authority_bump]];
+invoke_signed(&ix, &infos, &[seeds])?;`,
+  },
+  {
+    title: "Ika signature gate (programs/noctex/src/lib.rs:309)",
+    lang: "rust",
+    code: `pub fn finalize_settlement(ctx: Context<FinalizeSettlement>) -> Result<()> {
+    let ma = &ctx.accounts.message_approval;
+
+    require!(buy.message_approval == ma.key()
+          && sell.message_approval == ma.key(), MessageApprovalMismatch);
+    require!(ma.owner == &IKA_PROGRAM_ID, MessageApprovalNotIkaOwned);
+
+    let data = ma.try_borrow_data()?;
+    require!(data.len() >= 175, MessageApprovalMalformed);
+    require!(data[172] == 1, SettlementNotSigned);          // status = Signed
+    let sig_len = u16::from_le_bytes(data[173..175].try_into().unwrap());
+    require!(sig_len > 0, SettlementSignatureMissing);
+
+    buy.status = OrderStatus::Finalized;
+    sell.status = OrderStatus::Finalized;
+    Ok(())
 }`,
   },
   {
-    title: "LI.FI route after settlement (client/src/lifi-settle.ts)",
+    title: "Frontend submit_order (app/src/components/OrderForm.tsx)",
     lang: "typescript",
-    code: `import { createConfig, getQuote, executeRoute } from "@lifi/sdk";
+    code: `// Encrypt price + amount via gRPC-web, then submit via Phantom.
+const { program, publicKey } = await getProgramWithPhantom();
+const encrypt = createEncryptWebClient(ENCRYPT_GRPC_WEB);
 
-createConfig({ integrator: "noctex" });
+const ids = await encrypt.createInput({
+  chain: Chain.SOLANA,
+  inputs: [
+    { ciphertextBytes: mockCiphertextBytes(BigInt(price),  4), fheType: 4 },
+    { ciphertextBytes: mockCiphertextBytes(BigInt(amount), 4), fheType: 4 },
+  ],
+  authorized: NOCTEX_PROGRAM_ID.toBytes(),
+  networkEncryptionPublicKey: PRE_ALPHA_NETWORK_KEY,
+});
 
-export async function bridgeSettlement(
-  fromChain: "SOL",
-  toChain: number,  // Arbitrum=42161, Base=8453
-  amount: string,
-  fromToken: string,
-  toToken: string,
-) {
-  const quote = await getQuote({
-    fromChain, toChain,
-    fromToken, toToken,
-    fromAmount: amount,
-    fromAddress: walletPubkey,
-  });
-  return executeRoute(quote.routes[0]);
-}`,
+const sig = await program.methods
+  .submitOrder(new BN(nonce), sideArg, new PublicKey(ids[0]), new PublicKey(ids[1]))
+  .accountsPartial({ order: orderPda, owner: publicKey, systemProgram: SystemProgram.programId })
+  .rpc();`,
   },
 ];
 
@@ -304,12 +319,13 @@ export default function DocsPage() {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 0, flexWrap: "wrap" }}>
             {[
-              { label: "SUBMIT ORDER",    color: "var(--accent)",  detail: "FHE encrypt" },
-              { label: "EXECUTE MATCH",   color: "var(--accent)",  detail: "match_orders(EUint64)" },
-              { label: "SETTLE MATCH",    color: "var(--accent)",  detail: "set Settled status" },
-              { label: "SIGN SETTLEMENT", color: "#60a5fa",        detail: "Ika CPI → approve_message" },
-              { label: "dWALLET SIGNS",   color: "#60a5fa",        detail: "2PC-MPC Ed25519" },
-              { label: "LIFI BRIDGE",     color: "#a78bfa",        detail: "cross-chain delivery" },
+              { label: "SUBMIT ORDER",     color: "var(--accent)",  detail: "createInput → Order PDA" },
+              { label: "EXECUTE MATCH",    color: "var(--accent)",  detail: "execute_graph CPI" },
+              { label: "SETTLE MATCH",     color: "var(--accent)",  detail: "→ Settled" },
+              { label: "SIGN SETTLEMENT",  color: "#60a5fa",        detail: "approve_message CPI" },
+              { label: "IKA 2PC-MPC",      color: "#60a5fa",        detail: "off-chain signature" },
+              { label: "FINALIZE",         color: "#60a5fa",        detail: "verify sig → Finalized" },
+              { label: "LI.FI BRIDGE",     color: "#a78bfa",        detail: "optional cross-chain" },
             ].map(({ label, color, detail }, i, arr) => (
               <div key={label} style={{ display: "flex", alignItems: "center" }}>
                 <div style={{ textAlign: "center" }}>

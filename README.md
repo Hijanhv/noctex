@@ -2,6 +2,8 @@
 
 **Colosseum Frontier 2026 Hackathon** | Encrypt & Ika side track
 
+**Live demo: [noctex.vercel.app](https://noctex.vercel.app)** — click PLACE BUY / SELL to submit a real FHE-encrypted order to devnet, then run the on-page Match → Settle → Sign → Finalize flow.
+
 An order book where price and quantity stay encrypted from submit through match, and settlement requires an Ika 2PC-MPC signature the program controls. The matching itself runs as a fully homomorphic computation on ciphertexts — the executor never sees plaintext.
 
 ---
@@ -151,12 +153,20 @@ The MessageApproval PDA's seeds bind the signature to a specific (dwallet, schem
                        ─► NOA writes signature back (status=Signed)
 
   finalize-settlement <BUY> <SELL>
-                       ─► poll MessageApproval until byte[139]==1
+                       ─► poll MessageApproval until byte[172]==1
                        ─► program verifies owner / status / sig_len
                        ─► both Orders → Finalized
 ```
 
 Every step beyond `init-*` is in `client/src/` as a single bun script (`submit-order.ts`, `execute-match.ts`, `settle-match.ts`, `sign-settlement.ts`, `finalize-settlement.ts`).
+
+### Or just click through it at [noctex.vercel.app](https://noctex.vercel.app)
+
+The Next.js frontend (`app/`) mirrors the same pipeline:
+
+- **`OrderForm`** — calls Encrypt gRPC-web `createInput` from the browser, builds the ciphertexts, then submits via Phantom. No CLI required.
+- **`SettlementFlow`** — four buttons (Match → Settle → Sign → Finalize) that walk through the full state machine. Between Sign and Finalize the page shows the exact `noctex-ika-bootstrap sign` command for the Ika 2PC-MPC step (the Ika network's mock signer needs a Rust gRPC client to drive it).
+- **`/docs`** — protocol reference, lifecycle diagram, real code excerpts.
 
 ---
 

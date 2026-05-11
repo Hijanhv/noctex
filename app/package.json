@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.32.1",
+    "@encrypt.xyz/pre-alpha-solana-client": "^0.1.1",
     "@lifi/sdk": "^3.16.3",
     "@lifi/widget": "^3.40.12",
     "@solana/wallet-adapter-base": "0.9.23",
