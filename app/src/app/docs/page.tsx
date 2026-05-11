@@ -2,6 +2,68 @@
 
 const PROGRAM_ID = "833YAgrbapXnLiYkUq6tG6hWfZ7whX34Xs7CtBN8Nrvx";
 
+// Live devnet artefacts produced by this session's end-to-end run.
+// All TXs are real and viewable on Solana Explorer (cluster=devnet).
+const LIVE_PROOFS: { label: string; value: string; href: string }[] = [
+  {
+    label: "Noctex program",
+    value: "833YAgrb…CtBN8Nrvx",
+    href: "https://explorer.solana.com/address/833YAgrbapXnLiYkUq6tG6hWfZ7whX34Xs7CtBN8Nrvx?cluster=devnet",
+  },
+  {
+    label: "Encrypt program",
+    value: "4ebfzWdK…wArND8",
+    href: "https://explorer.solana.com/address/4ebfzWdKnrnGseuQpezXdG8yCdHqwQ1SSBHD3bWArND8?cluster=devnet",
+  },
+  {
+    label: "Ika program",
+    value: "87W54kGY…fiq1oY",
+    href: "https://explorer.solana.com/address/87W54kGYFQ1rgWqMeu4XTPHWXWmXSQCcjm8vCTfiq1oY?cluster=devnet",
+  },
+  {
+    label: "Bootstrapped dWallet",
+    value: "3om31VWz…JBi7aRG",
+    href: "https://explorer.solana.com/address/3om31VWzJx6oPt37qYcUSZFosfFGZgeegX7VjQBi7aRG?cluster=devnet",
+  },
+  {
+    label: "TX — execute_match (FHE CPI)",
+    value: "JdLWuJSr…evw2",
+    href: "https://explorer.solana.com/tx/JdLWuJSrDtcPvcdfmoVw2yREDNbYcFbGGwCmoDj7tEiCUqRJ5bSpSqJdvCLofYrooqgVtSp2nqN7oqtzDaxevw2?cluster=devnet",
+  },
+  {
+    label: "TX — sign_settlement (Ika CPI)",
+    value: "3ponRNZH…DFvb",
+    href: "https://explorer.solana.com/tx/3ponRNZHZmxRveZEciZyeYUWUUfv4iSby8BCsAaGu2zmRXp2irUsZ72e6U7QLcn8pndYN2BELhLiHkBkYi7zDFvb?cluster=devnet",
+  },
+  {
+    label: "TX — finalize_settlement (sig gate)",
+    value: "HMm7bQEn…WQci",
+    href: "https://explorer.solana.com/tx/HMm7bQEnxZH3Jrrw6FKXZuFw9o74P3qw6BZrfTC7KALdx6UnRcXyKV4ZnwyoLZTsPFa6ZnW5FZT1Km6E5hUWQci?cluster=devnet",
+  },
+  {
+    label: "MessageApproval (status=Signed)",
+    value: "kCq63KGk…ETBGMSY",
+    href: "https://explorer.solana.com/address/kCq63KGk8MfW69bRMtH223sa297B1VCbvsraETBGMSY?cluster=devnet",
+  },
+];
+
+// Program instruction surface — what each one does and what the frontend / CLI calls it.
+const INSTRUCTIONS: {
+  name: string;
+  effect: string;
+  surface: string;
+  surfaceKind: "browser" | "browser+cli" | "cli";
+}[] = [
+  { name: "submit_order",        effect: "Record (owner, side, encrypted_price, encrypted_amount) on a fresh Order PDA.", surface: "OrderForm 'PLACE BUY/SELL'", surfaceKind: "browser+cli" },
+  { name: "execute_match",       effect: "Run match_orders FHE graph via Encrypt CPI; persist output ciphertexts.",      surface: "SettlementFlow step 1",     surfaceKind: "browser+cli" },
+  { name: "settle_match",        effect: "Transition both Orders Matching → Settled.",                                    surface: "SettlementFlow step 2",     surfaceKind: "browser+cli" },
+  { name: "sign_settlement",     effect: "CPI Ika approve_message; bind MessageApproval to both Orders.",                 surface: "SettlementFlow step 3",     surfaceKind: "browser+cli" },
+  { name: "(Ika network signs)", effect: "Off-chain 2PC-MPC: gRPC Presign + Sign; commit 64-byte signature.",             surface: "noctex-ika-bootstrap sign", surfaceKind: "cli" },
+  { name: "finalize_settlement", effect: "Verify owner / status=Signed / sig_len > 0; advance to Finalized.",             surface: "SettlementFlow step 4",     surfaceKind: "browser+cli" },
+  { name: "cancel_order",        effect: "Owner-only, Pending-only cancellation.",                                        surface: "bun run cancel",            surfaceKind: "cli" },
+  { name: "initialize_dwallet",  effect: "One-time: record dWallet ID + CPI authority on DWalletConfig PDA.",             surface: "bun run init-dwallet",      surfaceKind: "cli" },
+];
+
 const PROTOCOLS = [
   {
     num: "01",
@@ -350,6 +412,234 @@ export default function DocsPage() {
         {/* Protocol cards */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, marginBottom: 28, border: "1px solid var(--border)" }}>
           {PROTOCOLS.map(p => <ProtocolCard key={p.num} p={p} />)}
+        </div>
+
+        {/* Live devnet proofs */}
+        <div style={{
+          background: "var(--surface-1)",
+          border: "1px solid var(--border)",
+          marginBottom: 28,
+        }}>
+          <div style={{
+            padding: "10px 16px",
+            borderBottom: "1px solid var(--border)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}>
+            <span style={{
+              fontFamily: "var(--font-display)",
+              fontSize: 11,
+              letterSpacing: "0.18em",
+              color: "var(--text-1)",
+            }}>
+              LIVE ON DEVNET
+            </span>
+            <span style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 9,
+              color: "var(--accent)",
+              letterSpacing: "0.08em",
+            }}>
+              EACH ROW LINKS TO SOLANA EXPLORER →
+            </span>
+          </div>
+          <div style={{ padding: "12px 16px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            {LIVE_PROOFS.map(({ label, value, href }) => (
+              <a
+                key={label}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "8px 12px",
+                  background: "var(--surface-2)",
+                  border: "1px solid var(--border)",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 10,
+                  textDecoration: "none",
+                  transition: "border-color 0.15s, background 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "var(--accent)";
+                  e.currentTarget.style.background = "rgba(0,255,136,0.04)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "var(--border)";
+                  e.currentTarget.style.background = "var(--surface-2)";
+                }}
+              >
+                <span style={{ color: "var(--text-2)", letterSpacing: "0.04em" }}>{label}</span>
+                <span style={{ color: "var(--accent)" }}>{value}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+
+        {/* Instruction surface */}
+        <div style={{
+          background: "var(--surface-1)",
+          border: "1px solid var(--border)",
+          marginBottom: 28,
+        }}>
+          <div style={{
+            padding: "10px 16px",
+            borderBottom: "1px solid var(--border)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}>
+            <span style={{
+              fontFamily: "var(--font-display)",
+              fontSize: 11,
+              letterSpacing: "0.18em",
+              color: "var(--text-1)",
+            }}>
+              PROGRAM INSTRUCTIONS
+            </span>
+            <div style={{ display: "flex", gap: 10, fontFamily: "var(--font-mono)", fontSize: 9 }}>
+              <span style={{ color: "var(--accent)", letterSpacing: "0.06em" }}>◈ BROWSER</span>
+              <span style={{ color: "#ffce4e", letterSpacing: "0.06em" }}>◇ CLI</span>
+            </div>
+          </div>
+          <div>
+            {INSTRUCTIONS.map(({ name, effect, surface, surfaceKind }) => {
+              const color =
+                surfaceKind === "browser" || surfaceKind === "browser+cli"
+                  ? "var(--accent)"
+                  : "#ffce4e";
+              const badge =
+                surfaceKind === "browser" ? "BROWSER" :
+                surfaceKind === "browser+cli" ? "BROWSER + CLI" :
+                "CLI ONLY";
+              return (
+                <div
+                  key={name}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "200px 1fr 160px",
+                    gap: 14,
+                    padding: "10px 16px",
+                    borderBottom: "1px solid var(--border)",
+                    alignItems: "center",
+                  }}
+                >
+                  <code style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 11,
+                    color: "var(--accent)",
+                    letterSpacing: "0.02em",
+                  }}>
+                    {name}
+                  </code>
+                  <span style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 10,
+                    color: "var(--text-1)",
+                    opacity: 0.85,
+                    lineHeight: 1.5,
+                  }}>
+                    {effect}
+                  </span>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "flex-end" }}>
+                    <span style={{
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 8,
+                      letterSpacing: "0.12em",
+                      color,
+                      border: `1px solid ${color}`,
+                      padding: "1px 6px",
+                    }}>
+                      {badge}
+                    </span>
+                    <span style={{
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 9,
+                      color: "var(--text-2)",
+                      letterSpacing: "0.02em",
+                    }}>
+                      {surface}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* What runs where — honesty block */}
+        <div style={{
+          background: "var(--surface-1)",
+          border: "1px solid var(--border)",
+          marginBottom: 28,
+          padding: "16px 20px",
+        }}>
+          <div style={{
+            fontFamily: "var(--font-display)",
+            fontSize: 11,
+            letterSpacing: "0.18em",
+            color: "var(--text-1)",
+            marginBottom: 12,
+          }}>
+            BROWSER vs. CLI — WHAT RUNS WHERE
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div>
+              <div style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 9,
+                color: "var(--accent)",
+                letterSpacing: "0.14em",
+                marginBottom: 8,
+                textTransform: "uppercase",
+              }}>
+                ◈ In the browser (Phantom-signed)
+              </div>
+              <ul style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 10,
+                color: "var(--text-1)",
+                lineHeight: 1.8,
+                paddingLeft: 16,
+                margin: 0,
+              }}>
+                <li>Encrypt gRPC-web <code>createInput</code> for price + amount</li>
+                <li><code>submit_order</code> via Phantom signature</li>
+                <li><code>execute_match</code> — pre-allocates 3 output ciphertexts then CPI</li>
+                <li><code>settle_match</code></li>
+                <li><code>sign_settlement</code> — Ika <code>approve_message</code> CPI</li>
+                <li><code>finalize_settlement</code> — polls MessageApproval, verifies sig gate</li>
+              </ul>
+            </div>
+            <div>
+              <div style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 9,
+                color: "#ffce4e",
+                letterSpacing: "0.14em",
+                marginBottom: 8,
+                textTransform: "uppercase",
+              }}>
+                ◇ Needs CLI (between Sign and Finalize)
+              </div>
+              <ul style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 10,
+                color: "var(--text-1)",
+                lineHeight: 1.8,
+                paddingLeft: 16,
+                margin: 0,
+              }}>
+                <li>Ika pre-alpha 2PC-MPC signing — gRPC Presign + Sign uses BCS + tonic with no browser equivalent.</li>
+                <li>Run <code>noctex-ika-bootstrap sign &lt;TX&gt; &lt;BUY&gt; &lt;SELL&gt;</code> from <code>client-rust/</code>.</li>
+                <li>The SettlementFlow panel prints the exact command after step 3 so the user can copy-paste.</li>
+                <li>Once the signature lands on-chain, step 4 (Finalize) runs from the browser again.</li>
+              </ul>
+            </div>
+          </div>
         </div>
 
         {/* Code snippets */}
