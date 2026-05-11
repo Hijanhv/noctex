@@ -11,13 +11,18 @@ pub struct Order {
     pub matched_with: Pubkey,
     pub output_price: Pubkey,
     pub output_amount: Pubkey,
+    /// MessageApproval PDA address recorded by sign_settlement so
+    /// finalize_settlement can match the account it's verifying against.
+    /// Default::default() until sign_settlement runs.
+    pub message_approval: Pubkey,
     pub nonce: u64,
     pub created_at: i64,
     pub bump: u8,
 }
 
 impl Order {
-    pub const LEN: usize = 8 + 32 + 1 + 32 + 32 + 1 + 32 + 32 + 32 + 8 + 8 + 1;
+    pub const LEN: usize =
+        8 + 32 + 1 + 32 + 32 + 1 + 32 + 32 + 32 + 32 + 8 + 8 + 1;
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Default, Debug)]
@@ -34,6 +39,8 @@ pub enum OrderStatus {
     Matching,
     Settled,
     Cancelled,
+    /// Ika 2PC-MPC signature has been verified on-chain. Terminal state.
+    Finalized,
 }
 
 #[event]
@@ -65,5 +72,14 @@ pub struct MatchSettled {
 #[event]
 pub struct OrderCancelled {
     pub order: Pubkey,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct SettlementFinalized {
+    pub buy_order: Pubkey,
+    pub sell_order: Pubkey,
+    pub message_approval: Pubkey,
+    pub signature_len: u16,
     pub timestamp: i64,
 }

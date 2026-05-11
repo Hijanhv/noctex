@@ -16,8 +16,25 @@ export const IKA_PROGRAM_ID = new PublicKey(
 export const NOCTEX_PROGRAM_ID = new PublicKey(noctexIdl.address);
 
 export const NOCTEX_CPI_AUTHORITY_SEED = Buffer.from("__ika_cpi_authority");
+export const ENCRYPT_CPI_AUTHORITY_SEED = Buffer.from("__encrypt_cpi_authority");
 export const DWALLET_CONFIG_SEED = Buffer.from("dwallet-config");
 export const ORDER_SEED = Buffer.from("order");
+
+// ── Encrypt PDA seeds (verified from the SDK e2e examples) ──
+export const ENCRYPT_CONFIG_SEED = Buffer.from("encrypt_config");
+export const ENCRYPT_DEPOSIT_SEED = Buffer.from("encrypt_deposit");
+export const ENCRYPT_EVENT_AUTHORITY_SEED = Buffer.from("__event_authority");
+export const ENCRYPT_NETWORK_KEY_SEED = Buffer.from("network_encryption_key");
+
+/**
+ * Pre-alpha network encryption key — fixed 32-byte mock used by the devnet
+ * executor (matches the constant `Buffer.alloc(32, 0x55)` in the SDK e2e demos).
+ * In production this will be the live network's public key.
+ */
+export const PRE_ALPHA_NETWORK_KEY = Buffer.alloc(32, 0x55);
+
+/** FHE type discriminator: EUint64 = 4 (from encrypt-types/types.rs). */
+export const FHE_TYPE_EUINT64 = 4;
 
 export function loadKeypair(filepath?: string): Keypair {
   const keyPath =
@@ -68,6 +85,62 @@ export function deriveCpiAuthorityPda(): [PublicKey, number] {
     [NOCTEX_CPI_AUTHORITY_SEED],
     NOCTEX_PROGRAM_ID,
   );
+}
+
+/** PDA of our Encrypt CPI authority (seed = b"__encrypt_cpi_authority"). */
+export function deriveEncryptCpiAuthorityPda(): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [ENCRYPT_CPI_AUTHORITY_SEED],
+    NOCTEX_PROGRAM_ID,
+  );
+}
+
+/** Encrypt program PDAs (seeds verified from SDK e2e demos). */
+export function deriveEncryptConfigPda(): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [ENCRYPT_CONFIG_SEED],
+    ENCRYPT_PROGRAM_ID,
+  );
+}
+
+export function deriveEncryptEventAuthorityPda(): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [ENCRYPT_EVENT_AUTHORITY_SEED],
+    ENCRYPT_PROGRAM_ID,
+  );
+}
+
+/** One deposit PDA per payer — must be initialized once before any CPI. */
+export function deriveEncryptDepositPda(payer: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [ENCRYPT_DEPOSIT_SEED, payer.toBuffer()],
+    ENCRYPT_PROGRAM_ID,
+  );
+}
+
+export function deriveEncryptNetworkKeyPda(
+  networkKey: Uint8Array = PRE_ALPHA_NETWORK_KEY,
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [ENCRYPT_NETWORK_KEY_SEED, Buffer.from(networkKey)],
+    ENCRYPT_PROGRAM_ID,
+  );
+}
+
+/**
+ * Pack a u64 value into the 17-byte mock-ciphertext format the pre-alpha
+ * executor expects: `[fhe_type(1) || value_le(16)]`. The 16-byte field
+ * tail is little-endian and 0-padded for types narrower than u128.
+ */
+export function mockCiphertextBytes(value: bigint, fheType: number): Uint8Array {
+  const buf = new Uint8Array(17);
+  buf[0] = fheType;
+  let v = value;
+  for (let i = 0; i < 16; i++) {
+    buf[1 + i] = Number(v & 0xffn);
+    v >>= 8n;
+  }
+  return buf;
 }
 
 /** Curve constants — match DWalletCurve discriminants in ika-dwallet-types. */

@@ -10,11 +10,14 @@
     "watch": "bun run src/watch-events.ts",
     "init-dwallet": "bun run src/init-dwallet.ts",
     "update-dwallet": "bun run src/update-dwallet.ts",
+    "init-encrypt-deposit": "bun run src/init-encrypt-deposit.ts",
     "sign-settlement": "bun run src/sign-settlement.ts",
+    "finalize-settlement": "bun run src/finalize-settlement.ts",
     "check": "bun run src/check.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.32.1",
+    "@encrypt.xyz/pre-alpha-solana-client": "^0.1.0",
     "@noble/hashes": "^2.2.0",
     "@solana/web3.js": "^1.95.0"
   },
